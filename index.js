@@ -1,3 +1,14 @@
+let dat = require('dat.gui')
+
+let uiState = {
+  running: true,
+  rate: -4
+}
+
+let gui = new dat.default.GUI()
+gui.add(uiState, 'running')
+gui.add(uiState, 'rate').min(-9).max(9).step(1)
+
 let container = document.getElementById('container')
 
 let regl = require('regl')(container)
@@ -16,7 +27,7 @@ const state = (Array(2)).fill().map(() =>
     depthStencil: false
   }))
 
-const updateLife = regl({
+const update = regl({
   frag: `
   precision mediump float;
   uniform sampler2D prevState;
@@ -35,7 +46,7 @@ const updateLife = regl({
     }
   }`,
 
-  framebuffer: ({tick}) => state[(tick + 1) % 2]
+  framebuffer: (ctx, {tick}) => state[(tick + 1) % 2]
 })
 
 const setupQuad = regl({
@@ -62,7 +73,7 @@ const setupQuad = regl({
   },
 
   uniforms: {
-    prevState: ({tick}) => state[tick % 2]
+    prevState: (ctx, {tick}) => state[tick % 2]
   },
 
   depth: { enable: false },
@@ -70,9 +81,26 @@ const setupQuad = regl({
   count: 3
 })
 
+let frameTick = 0
+let tick = 0
 regl.frame(() => {
-  setupQuad(() => {
-    regl.draw()
-    updateLife()
-  })
+  let iterations
+  if (uiState.rate < 0) {
+    let period = -uiState.rate + 1
+    iterations = (frameTick % period) === 0 ? 1 : 0
+  } else {
+    iterations = uiState.rate + 1
+  }
+
+  if (uiState.running) {
+    for (let i = 0; i < iterations; i++) {
+      tick++
+      setupQuad({ tick }, () => {
+        update({ tick })
+      })
+    }
+    setupQuad({ tick })
+  }
+
+  frameTick++
 })
