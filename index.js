@@ -11,6 +11,23 @@ gui.add(uiState, 'rate').min(-9).max(9).step(1)
 
 let container = document.getElementById('container')
 
+let mouse = {
+  buttons: 0,
+  x: 0,
+  y: 0
+}
+const handleMouseChange = setButtons => e => {
+  e.preventDefault()
+  if (setButtons) {
+    mouse.buttons = e.buttons
+  }
+  mouse.x = (e.clientX - container.offsetLeft) / container.clientWidth
+  mouse.y = (e.clientY - container.offsetTop) / container.clientHeight
+}
+container.addEventListener('mousedown', handleMouseChange(true))
+window.addEventListener('mousemove', handleMouseChange(false))
+window.addEventListener('mouseup', handleMouseChange(true))
+
 let regl = require('regl')(container)
 
 const RADIUS = 64
@@ -26,6 +43,9 @@ const state = (Array(2)).fill().map(() =>
     }),
     depthStencil: false
   }))
+
+const getPrevState = (ctx, {flipped}) => state[!flipped | 0]
+const getNextState = (ctx, {flipped}) => state[flipped | 0]
 
 const update = regl({
   frag: `
@@ -46,19 +66,51 @@ const update = regl({
     }
   }`,
 
-  framebuffer: (ctx, {tick}) => state[(tick + 1) % 2]
+  uniforms: {
+    prevState: getPrevState
+  },
+
+  framebuffer: getNextState
 })
 
-const setupQuad = regl({
+const input = regl({
   frag: `
   precision mediump float;
-  uniform sampler2D prevState;
+  void main() {
+    gl_FragColor = vec4(1,1,1,1);
+  }`,
+
+  vert: `
+  precision mediump float;
+  uniform vec2 center;
+  attribute vec2 position;
+  void main() {
+    gl_Position = vec4(position / 10. + 2. * center - 1., 0, 1);
+  }`,
+
+  uniforms: {
+    center: regl.prop('center')
+  },
+
+  framebuffer: getNextState
+})
+
+const render = regl({
+  frag: `
+  precision mediump float;
+  uniform sampler2D nextState;
   varying vec2 uv;
   void main() {
-    float state = texture2D(prevState, uv).r;
+    float state = texture2D(nextState, uv).r;
     gl_FragColor = vec4(vec3(state), 1);
   }`,
 
+  uniforms: {
+    nextState: getNextState
+  },
+})
+
+const setupQuad = regl({
   vert: `
   precision mediump float;
   attribute vec2 position;
@@ -69,38 +121,46 @@ const setupQuad = regl({
   }`,
 
   attributes: {
-    position: [ -4, -4, 4, -4, 0, 4 ]
+    position: [ -1, -1, -1, 1, 1, -1, 1, 1 ]
   },
 
-  uniforms: {
-    prevState: (ctx, {tick}) => state[tick % 2]
-  },
+  primitive: 'triangle strip',
 
   depth: { enable: false },
 
-  count: 3
+  count: 4
 })
 
-let frameTick = 0
 let tick = 0
+let flipped = false
 regl.frame(() => {
+  let rerender = false
+
   let iterations
   if (uiState.rate < 0) {
     let period = -uiState.rate + 1
-    iterations = (frameTick % period) === 0 ? 1 : 0
+    iterations = (tick % period) === 0 ? 1 : 0
   } else {
     iterations = uiState.rate + 1
   }
 
   if (uiState.running) {
     for (let i = 0; i < iterations; i++) {
-      tick++
-      setupQuad({ tick }, () => {
-        update({ tick })
-      })
+      flipped = !flipped
+      setupQuad(() => update({ flipped }))
+      rerender = true
     }
-    setupQuad({ tick })
   }
 
-  frameTick++
+  if (mouse.buttons === 1) {
+    let center = [mouse.x, 1 - mouse.y]
+    setupQuad(() => input({ flipped, center }))
+    rerender = true
+  }
+
+  if (rerender) {
+    setupQuad(() => render({ flipped }))
+  }
+
+  tick++
 })
