@@ -5,8 +5,12 @@ let container = document.getElementById('container')
 let regl = require('regl')(container)
 
 const CellType = {
-  Empty: [0, 0, 0],
-  Alive: [1, 1, 1]
+  Empty: [1 / 255, 1 / 255, 1 / 255],
+  GreenWire: [1 / 255, 126 / 255, 1 / 255],
+  BlueWire: [1 / 255, 1 / 255, 126 / 255],
+  Connector: [1 / 255, 126 / 255, 126 / 255],
+  Source: [1, 1, 1],
+  Sink: [254 / 255, 0, 0]
 }
 
 // init mouse
@@ -32,10 +36,10 @@ window.addEventListener('mouseup', handleMouseChange(true))
 // init controllers
 
 let ctrl = {
-  running: true,
-  rate: -4,
+  running: false,
+  rate: 0,
   brushWidth: 1,
-  brushType: CellType.Alive
+  brushType: CellType.GreenWire
 }
 
 let gui = new dat.default.GUI()
@@ -55,9 +59,25 @@ let keyBindings = {
     fn () { ctrl.brushType = CellType.Empty }
   },
   '2': {
-    info: 'Select brushType Alive',
-    fn () { ctrl.brushType = CellType.Alive }
-  }
+    info: 'Select brushType GreenWire',
+    fn () { ctrl.brushType = CellType.GreenWire }
+  },
+  '3': {
+    info: 'Select brushType BlueWire',
+    fn () { ctrl.brushType = CellType.BlueWire }
+  },
+  '4': {
+    info: 'Select brushType Connector',
+    fn () { ctrl.brushType = CellType.Connector }
+  },
+  '5': {
+    info: 'Select brushType Source',
+    fn () { ctrl.brushType = CellType.Source }
+  },
+  '6': {
+    info: 'Select brushType Sink',
+    fn () { ctrl.brushType = CellType.Sink }
+  },
 }
 
 document.addEventListener('keydown', e => {
@@ -71,8 +91,7 @@ document.addEventListener('keydown', e => {
 // init resources
 
 const RADIUS = 64
-const INITIAL_CONDITIONS = (Array(RADIUS * RADIUS * 4)).fill(0).map(
-  () => Math.random() > 0.9 ? 255 : 0)
+const INITIAL_CONDITIONS = (Array(RADIUS * RADIUS * 4)).fill(1)
 
 const state = (Array(2)).fill().map(() =>
   regl.framebuffer({
@@ -91,24 +110,7 @@ const getNextState = (ctx, {flipped}) => state[flipped | 0]
 
 let cmd = {
   update: regl({
-    frag: `
-    precision mediump float;
-    uniform float radius;
-    uniform sampler2D prevState;
-    varying vec2 uv;
-    void main() {
-      float n = 0.0;
-      for(int dx=-1; dx<=1; ++dx)
-      for(int dy=-1; dy<=1; ++dy) {
-        n += texture2D(prevState, uv+vec2(dx,dy)/radius).r;
-      }
-      float s = texture2D(prevState, uv).r;
-      if(n > 3.0+s || n < 3.0) {
-        gl_FragColor = vec4(0,0,0,1);
-      } else {
-        gl_FragColor = vec4(1,1,1,1);
-      }
-    }`,
+    frag: require('glslify').file('./rule.frag'),
 
     uniforms: {
       prevState: getPrevState,
@@ -152,8 +154,8 @@ let cmd = {
     uniform sampler2D nextState;
     varying vec2 uv;
     void main() {
-      float state = texture2D(nextState, uv).r;
-      gl_FragColor = vec4(vec3(state), 1);
+      vec3 state = texture2D(nextState, uv).rgb;
+      gl_FragColor = vec4(state, 1);
     }`,
 
     uniforms: {
@@ -187,10 +189,9 @@ let cmd = {
 
 let tick = 0
 let flipped = false
+let rerender = true
 
 regl.frame(() => {
-  let rerender = false
-
   let iterations
   if (ctrl.rate < 0) {
     let period = -ctrl.rate + 1
@@ -221,5 +222,6 @@ regl.frame(() => {
     cmd.setupQuad(() => cmd.render({ flipped }))
   }
 
+  rerender = false
   tick++
 })
