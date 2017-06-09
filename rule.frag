@@ -32,6 +32,29 @@ Off         1   126
 const float WireOn = 127. / 255.;
 const float One = 1. / 255.;
 
+int get_next_power(int p, int q, vec4 a) {
+    if (p > WIRE_OFF) {
+        bool pull_down = a.x * a.y * a.z * a.w == 0.;
+        if (pull_down && q == 1) {
+            // next to Sink -> On Fall
+            return ON_FALL;
+        } else if (p == ON_FALL) {
+            // On Fall -> Off
+            return OFF;
+        } else if (p > ON_FALL) {
+            int max_power = BYTE(max(max(a.x, a.y), max(a.z, a.w)));
+
+            if (p > OFF && p > max_power) {
+                // On Peak -> On Fall
+                return ON_FALL;
+            } else if (max_power > OFF) {
+                return max_power - 1;
+            }
+        }
+    }
+    return p;
+}
+
 void main() {
     vec4 cell = GET(0, 0);
     int r = BYTE(cell.r);
@@ -63,45 +86,9 @@ void main() {
     if (r == WIRE_ON || r == WIRE_OFF) {
         r = WIRE_ON;
 
-        if (g > WIRE_OFF) {
-            bool pull_down = e.g * w.g * n.g * s.g == 0.;
-            if (pull_down && b == 1) {
-                // next to Sink -> On Fall
-                g = ON_FALL;
-            } else if (g == ON_FALL) {
-                // On Fall -> Off
-                g = OFF;
-            } else if (g > ON_FALL) {
-                int max_power = BYTE(max(max(e.g, w.g), max(n.g, s.g)));
+        g = get_next_power(g, b, vec4(e.g, w.g, n.g, s.g));
 
-                if (g > OFF && g > max_power) {
-                    // On Peak -> On Fall
-                    g = ON_FALL;
-                } else if (max_power > OFF) {
-                    g = max_power - 1;
-                }
-            }
-        }
-
-        if (b > WIRE_OFF) {
-            bool pull_down = e.b * w.b * n.b * s.b == 0.;
-            if (pull_down && g == 1) {
-                // next to Sink -> On Fall
-                b = ON_FALL;
-            } else if (b == ON_FALL) {
-                // On Fall -> Off
-                b = OFF;
-            } else if (b > ON_FALL) {
-                int max_power = BYTE(max(max(e.b, w.b), max(n.b, s.b)));
-
-                if (b > OFF && b > max_power) {
-                    // On Peak -> On Fall
-                    b = ON_FALL;
-                } else if (max_power > OFF) {
-                    b = max_power - 1;
-                }
-            }
-        }
+        b = get_next_power(b, g, vec4(e.b, w.b, n.b, s.b));
 
         if ((g == 1 || g == OFF) && (b == 1 || b == OFF)) {
             // On Min-1 -> Off
