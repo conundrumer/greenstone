@@ -6,9 +6,9 @@ let regl = require('regl')(container)
 
 const CellType = {
   Empty: [1 / 255, 1 / 255, 1 / 255],
-  GreenWire: [1 / 255, 126 / 255, 1 / 255],
-  BlueWire: [1 / 255, 1 / 255, 126 / 255],
-  Connector: [1 / 255, 126 / 255, 126 / 255],
+  GreenWire: [2 / 255, 126 / 255, 1 / 255],
+  BlueWire: [2 / 255, 1 / 255, 126 / 255],
+  Connector: [2 / 255, 126 / 255, 126 / 255],
   Source: [1, 1, 1],
   Sink: [254 / 255, 0, 0]
 }
@@ -44,7 +44,7 @@ let ctrl = {
 
 let gui = new dat.default.GUI()
 gui.add(ctrl, 'running')
-gui.add(ctrl, 'rate').min(-9).max(9).step(1)
+gui.add(ctrl, 'rate').min(-9).max(15).step(1)
 gui.add(ctrl, 'brushWidth').min(1).max(20).step(1)
 gui.add(ctrl, 'brushType', CellType)
 const refreshGui = () => gui.__controllers.forEach(c => c.updateDisplay())
