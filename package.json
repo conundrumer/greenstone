@@ -4,7 +4,7 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "build": "browserify index.js -t babelify -t glslify | uglify -cm > bundle.js",
+    "build": "browserify index.js -t babelify -t glslify | uglifyjs -cm > bundle.js",
     "start": "budo index.js:bundle.js --live -- -t babelify -t glslify"
   },
   "author": "",
@@ -19,5 +19,8 @@
   "dependencies": {
     "dat.gui": "github:dataarts/dat.gui",
     "regl": "^1.3.0"
+  },
+  "babel": {
+    "presets": ["es2015"]
   }
 }

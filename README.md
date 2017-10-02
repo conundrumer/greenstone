@@ -1,6 +1,8 @@
 # Greenstone [working title]
 
-Cellular Automata for circuit simulation
+[Play it here](http://greenstone-wip.surge.sh/)
+
+GPU cellular automata for circuit simulation. I designed the rules as a tradeoff between complexity in possible states and complexity in components and circuits, in addition to having these rules be potentially implemented in 3d and with limited power.
 
 ## Usage
 
