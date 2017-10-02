@@ -44,6 +44,8 @@ window.addEventListener('dragover', e => e.preventDefault())
 
 // init controllers
 
+let rerender = true
+let step = false
 let ctrl = {
   radius: 6,
   running: false,
@@ -53,11 +55,11 @@ let ctrl = {
 }
 
 let gui = new dat.default.GUI()
-gui.add(ctrl, 'running')
-gui.add(ctrl, 'rate').min(-9).max(15).step(1)
-gui.add(ctrl, 'brushWidth').min(1).max(20).step(1)
-gui.add(ctrl, 'brushType', CellType)
 let radiusController = gui.add(ctrl, 'radius').min(0).max(12).step(1)
+gui.add(ctrl, 'brushType', CellType)
+gui.add(ctrl, 'brushWidth').min(1).max(20).step(1)
+gui.add(ctrl, 'rate').min(-9).max(15).step(1)
+gui.add(ctrl, 'running')
 
 const refreshGui = () => gui.__controllers.forEach(c => c.updateDisplay())
 
@@ -90,6 +92,10 @@ let keyBindings = {
     info: 'Select brushType Sink',
     fn () { ctrl.brushType = CellType.Sink }
   },
+  'Enter': {
+    info: 'Step by one frame',
+    fn () { step = true }
+  }
 }
 
 document.addEventListener('keydown', e => {
@@ -118,6 +124,26 @@ function initState (radius, state = (Array(radius * radius * 4)).fill(1)) {
       depthStencil: false
     }))
 }
+
+radiusController.onFinishChange(radius => {
+  state = initState(1 << radius)
+  rerender = true
+})
+window.addEventListener('drop', e => {
+  e.preventDefault()
+  let file = e.dataTransfer.files[0]
+
+  let image = new window.Image()
+  image.src = window.URL.createObjectURL(file)
+  image.onload = () => {
+    window.image = image
+    state = initState(image.width, image)
+    ctrl.radius = Math.log2(image.width)
+    refreshGui()
+    rerender = true
+  }
+})
+
 // init commands
 
 const getPrevState = (ctx, {flipped}) => state[!flipped | 0]
@@ -204,37 +230,19 @@ let cmd = {
 
 let tick = 0
 let flipped = false
-let rerender = true
-
-radiusController.onFinishChange(radius => {
-  state = initState(1 << radius)
-  rerender = true
-})
-window.addEventListener('drop', e => {
-  e.preventDefault()
-  let file = e.dataTransfer.files[0]
-
-  let image = new window.Image()
-  image.src = window.URL.createObjectURL(file)
-  image.onload = () => {
-    window.image = image
-    state = initState(image.width, image)
-    ctrl.radius = Math.log2(image.width)
-    refreshGui()
-    rerender = true
-  }
-})
 
 regl.frame(() => {
   let iterations
-  if (ctrl.rate < 0) {
+  if (step) {
+    iterations = 1
+  } else if (ctrl.rate < 0) {
     let period = -ctrl.rate + 1
     iterations = (tick % period) === 0 ? 1 : 0
   } else {
     iterations = ctrl.rate + 1
   }
 
-  if (ctrl.running) {
+  if (ctrl.running || step) {
     for (let i = 0; i < iterations; i++) {
       flipped = !flipped
       cmd.setupQuad(() => cmd.update({ flipped }))
@@ -256,6 +264,7 @@ regl.frame(() => {
     cmd.setupQuad(() => cmd.render({ flipped }))
   }
 
+  step = false
   rerender = false
   tick++
 })
